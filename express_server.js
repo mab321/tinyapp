@@ -25,6 +25,20 @@ const urlDatabase = {
   "9sm5xK": "http://www.google.com"
 };
 
+//users database
+const users = {
+  "userRandomID": {
+    id: "userRandomID", 
+    email: "user@example.com", 
+    password: "purple-monkey-dinosaur"
+  },
+ "user2RandomID": {
+    id: "user2RandomID", 
+    email: "user2@example.com", 
+    password: "dishwasher-funk"
+  }
+};
+
 app.get("/", (req, res) => {
   res.send("Hello!");
 });
@@ -34,19 +48,37 @@ app.get("/hello", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const templateVars = {urls: urlDatabase, username: undefined};
-  if (req.cookies && req.cookies.username) {
-    templateVars.username = req.cookies.username;
+  const templateVars = {urls: urlDatabase, user: undefined};
+  if (req.cookies && req.cookies.user_id) {
+    templateVars.user = users[req.cookies.user_id];
     
   }
   
   res.render("urls_index", templateVars);
 });
+// rendering registeration page
+app.get("/register", (req, res) => {
+  const templateVars = {user: undefined};
+  res.render("urls_registeration", templateVars);
+});
+
+//  rendering login page
+app.get("/login", (req, res) => {
+  if (req.cookies.user_id) {
+    res.redirect("/urls")
+  } else {
+    
+    const templateVars = {user: undefined};
+     res.render("urls_login", templateVars);
+
+  }
+
+});
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = {username: undefined}
-  if(req.cookies && req.cookies.username){
-  templateVars.username = req.cookies.username;
+  const templateVars = {user: undefined}
+  if(req.cookies && req.cookies.user_id){
+  templateVars.user = users[req.cookies.user_id];
   res.render("urls_new", templateVars);
   }
   res.render("urls_new",templateVars);
@@ -54,9 +86,9 @@ app.get("/urls/new", (req, res) => {
 
 
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL], username: undefined};
-  if(req.cookies && req.cookies.username){
-   templateVars.username = req.cookies.username;
+  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL], user: undefined};
+  if(req.cookies && req.cookies.user_id){
+   templateVars.user = users[req.cookies.user_id];
    res.render("urls_show", templateVars);
   }
   res.render("urls_show", templateVars);
@@ -100,21 +132,50 @@ app.post("/urls/:shortURL/delete", (req,res) => {
   res.redirect("/urls");
 });
 
+// registeration handling
+app.post("/register", (req, res) => {
+  const {email, password} = req.body;
+
+  if (!email || !password) {
+    res.status(400).send("User did not enter all required fields")
+  }
+
+  if(emailExists(email)) {
+    res.status(400).send("This email already in use");
+  }
+  if(!emailExists(email)) {
+    const id = generateRandomString();
+    users[id] = {id: id, email: email, password: password};
+    res.cookie("user_id", id);
+    res.redirect("/urls");
+  }
+
+  
+})
+
 // login post
 app.post("/login",(req, res) => {
-  const {userName} = req.body;
-  if(userName) {
-    res.cookie("username",userName);
+  const {email, password} = req.body;
+
+  if (!emailExists(email)) {
+    res.status(403).send("No such account found");
+  }
+
+  if(emailExists(email)) {
+    const id = getUserIdFromEmail(email);
+    if (password === users[id].password) {
+    res.cookie("user_id", id);
     res.redirect("/urls");
-  } else {
-    res.status(403).send("Cannot enter empty username"); 
+    } else {
+      res.status(403).send("Password does not match");
+    }
   }
 
 });
 
 //logout post and reset cookie
 app.post("/logout", (req,res) => {
-  res.clearCookie("username");
+  res.clearCookie("user_id");
   return res.redirect("/urls");
 });
 
@@ -122,3 +183,27 @@ app.post("/logout", (req,res) => {
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
+
+const emailExists = function(email) {
+
+  for (const account in users) {
+    if (users[account].email === email) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+const getUserIdFromEmail = function(email) {
+
+  for (const acc in users) {
+    if (users[acc].email === email) {
+      return users[acc].id;
+    }
+  }
+
+  return false;
+}
+
+
