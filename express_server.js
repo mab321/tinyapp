@@ -2,12 +2,15 @@ const express = require("express");
 const app = express();
 const PORT = 8080; // default port 8080
 const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
+const cookieSession = require("cookie-session");
 const bcrypt = require("bcryptjs");
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({extended: true}));
-app.use(cookieParser());
+app.use(cookieSession({
+  name: 'session',
+  keys: ["wa7ed", "ethnain","thalatha"]
+}));
 
 // Functions
 //generates random 6 character string
@@ -52,9 +55,9 @@ app.get("/hello", (req, res) => {
 });
 // main page
 app.get("/urls", (req, res) => {
-  const templateVars = {urls: urlForUser(req.cookies.user_id), user: undefined};
-  if (req.cookies && req.cookies.user_id) {
-    templateVars.user = users[req.cookies.user_id];
+  const templateVars = {urls: urlForUser(req.session.userId, urlDatabase), user: undefined};
+  if (req.session.userId) {
+    templateVars.user = users[req.session.userId];
     
   }
   
@@ -68,7 +71,7 @@ app.get("/register", (req, res) => {
 
 //  rendering login page
 app.get("/login", (req, res) => {
-  if (req.cookies.user_id) {
+  if (req.session.userId) {
     res.redirect("/urls")
   } else {
     
@@ -81,8 +84,8 @@ app.get("/login", (req, res) => {
 // renders new createurl page
 app.get("/urls/new", (req, res) => {
   const templateVars = {user: undefined}
-  if(req.cookies && req.cookies.user_id){
-  templateVars.user = users[req.cookies.user_id];
+  if(req.session.userId){
+  templateVars.user = users[req.session.userId];
   res.render("urls_new", templateVars);
   }
   res.render("urls_login",templateVars);
@@ -92,8 +95,8 @@ app.get("/urls/new", (req, res) => {
 app.get("/urls/:shortURL", (req, res) => {
   if (urlDatabase[req.params.shortURL]) {
     const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL].longURL, user: undefined};
-    if (req.cookies && req.cookies.user_id) {
-    templateVars.user = users[req.cookies.user_id];
+    if (req.session.userId) {
+    templateVars.user = users[req.session.userId];
     res.render("urls_show", templateVars);
     }
     res.render("urls_show", templateVars);
@@ -120,11 +123,13 @@ app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
 
-//Posts
+//POST requests
+
+// redirects to edit page of newly created url or main page if user is not logged in.
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
-  if (req.cookies.user_id) {
-  urlDatabase[shortURL] = {longURL: req.body.longURL, userID: req.cookies.user_id};
+  if (req.session.userId) {
+  urlDatabase[shortURL] = {longURL: req.body.longURL, userID: req.session.userId};
   res.redirect(`/urls/${shortURL}`);
   } else {
     res.redirect("/urls");
@@ -133,9 +138,9 @@ app.post("/urls", (req, res) => {
 
 // handle editing long url
 app.post("/urls/:id", (req,res) => {
-  const userid = req.cookies.user_id;
+  const userid = req.session.userId;
   const newURL = req.body.newURL;
-  const userURLs = urlForUser(userid);
+  const userURLs = urlForUser(userid, urlDatabase);
   
   if (Object.keys(userURLs).includes(req.params.id)) {
     if (newURL) {
@@ -150,8 +155,8 @@ app.post("/urls/:id", (req,res) => {
 });
 // handle Delete POSt
 app.post("/urls/:shortURL/delete", (req,res) => {
-  const userid = req.cookies.user_id;
-  const userURLs = urlForUser(userid);
+  const userid = req.session.userId;
+  const userURLs = urlForUser(userid, urlDatabase);
   if (!userid) {
     return res.status(401).send("You are not authorized to delete");
   }
@@ -172,13 +177,13 @@ app.post("/register", (req, res) => {
     res.status(400).send("User did not enter all required fields")
   }
 
-  if(emailExists(email)) {
+  if(emailExists(email, users)) {
     res.status(400).send("This email already in use");
   }
-  if(!emailExists(email)) {
+  if(!emailExists(email, users)) {
     const id = generateRandomString();
     users[id] = {id: id, email: email, password: bcrypt.hashSync(password, 10)};
-    res.cookie("user_id", id);
+    req.session.userId = id;
     res.redirect("/urls");
   }
 
@@ -189,14 +194,14 @@ app.post("/register", (req, res) => {
 app.post("/login",(req, res) => {
   const {email, password} = req.body;
 
-  if (!emailExists(email)) {
+  if (!emailExists(email, users)) {
     res.status(403).send("No such account found");
   }
 
-  if(emailExists(email)) {
-    const id = getUserIdFromEmail(email);
+  if(emailExists(email, users)) {
+    const id = getUserIdFromEmail(email, users);
     if (bcrypt.compareSync(password, users[id].password)) {
-    res.cookie("user_id", id);
+    req.session.userId = id;
     res.redirect("/urls");
     } else {
       res.status(403).send("Password does not match");
@@ -205,9 +210,9 @@ app.post("/login",(req, res) => {
 
 });
 
-//logout post and reset cookie
+//logout post and reset session
 app.post("/logout", (req,res) => {
-  res.clearCookie("user_id");
+  req.session = null;
   return res.redirect("/urls");
 });
 
@@ -216,10 +221,10 @@ app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
 
-const emailExists = function(email) {
+const emailExists = function(email, usersDB) {
 
-  for (const account in users) {
-    if (users[account].email === email) {
+  for (const account in usersDB) {
+    if (usersDB[account].email === email) {
       return true;
     }
   }
@@ -227,26 +232,37 @@ const emailExists = function(email) {
   return false;
 }
 
-const getUserIdFromEmail = function(email) {
+const getUserIdFromEmail = function(email, usersDB) {
 
-  for (const acc in users) {
-    if (users[acc].email === email) {
-      return users[acc].id;
+  for (const acc in usersDB) {
+    if (usersDB[acc].email === email) {
+      return usersDB[acc].id;
     }
   }
 
   return false;
 }
 
-const urlForUser = function(userId) {
+const urlForUser = function(userId, urlDB) {
   const userUrls = {};
 
-  for (const urls in urlDatabase) {
-    if (urlDatabase[urls].userID === userId) {
-      userUrls[urls] = urlDatabase[urls];
+  for (const urls in urlDB) {
+    if (urlDB[urls].userID === userId) {
+      userUrls[urls] = urlDB[urls];
     }
   }
   return userUrls;
+}
+
+// checks if the user is in the user db
+const userIdExists = function(userId, usersDB) {
+  
+  for (const user in usersDB) {
+    if(usersDB[user].id === userId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 
