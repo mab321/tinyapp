@@ -12,6 +12,13 @@
   <%- include('partials/_header') %>
   <main style="margin: 1em;">
     <h3>My URLs</h3>
+    <% if (user === undefined) { %>
+      <div class="card border-info mb-3">
+        <div class="card-body text-info">
+          <p class="card-text">Please login or register to view URLs.</p>
+        </div>
+      </div>
+    <% } %>
     <table class="table">
       <thead>
         <tr>
@@ -25,7 +32,7 @@
         <% for(let url in urls) { %>
           <tr>
             <td><%= url %></td>
-            <td><%= urls[url] %></td>
+            <td><%= urls[url].longURL %></td>
             <td><form method="GET" action="/urls/<%= url %>">
               <button type="submit" id="btnSubmit" class="btn btn-outline-primary">Edit</button>
             </form></td>
