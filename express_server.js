@@ -21,8 +21,16 @@ function generateRandomString() {
 }
 
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": {
+      longURL: "http://www.lighthouselabs.ca",
+      userID: "userRandomID"
+
+  },
+  "9sm5xK": {
+      longURL: "http://www.google.com",
+      userID: "userRandomID"
+
+  }
 };
 
 //users database
@@ -46,9 +54,9 @@ app.get("/", (req, res) => {
 app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
 });
-
+// main page
 app.get("/urls", (req, res) => {
-  const templateVars = {urls: urlDatabase, user: undefined};
+  const templateVars = {urls: getUserUrls(req.cookies.user_id), user: undefined};
   if (req.cookies && req.cookies.user_id) {
     templateVars.user = users[req.cookies.user_id];
     
@@ -74,33 +82,39 @@ app.get("/login", (req, res) => {
   }
 
 });
-
+// renders new createurl page
 app.get("/urls/new", (req, res) => {
   const templateVars = {user: undefined}
   if(req.cookies && req.cookies.user_id){
   templateVars.user = users[req.cookies.user_id];
   res.render("urls_new", templateVars);
   }
-  res.render("urls_new",templateVars);
+  res.render("urls_login",templateVars);
 });
 
-
+// renders url edit page
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL], user: undefined};
-  if(req.cookies && req.cookies.user_id){
-   templateVars.user = users[req.cookies.user_id];
-   res.render("urls_show", templateVars);
+  if (urlDatabase[req.params.shortURL]) {
+    const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL].longURL, user: undefined};
+    if (req.cookies && req.cookies.user_id) {
+    templateVars.user = users[req.cookies.user_id];
+    res.render("urls_show", templateVars);
+    }
+    res.render("urls_show", templateVars);
+
+  } else {
+    res.status(404).send("the requested short URL does not exists");
   }
-  res.render("urls_show", templateVars);
+  
 });
 // redirect to original longURL website
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
   if (urlDatabase[shortURL]) {
-    const longURL = urlDatabase[shortURL];
+    const longURL = urlDatabase[shortURL].longURL;
     res.redirect(longURL);
   } else {
-    res.send("404 URL no Found");
+    res.status(404).send("404 URL not Found");
   }
   
   
@@ -113,23 +127,45 @@ app.get("/urls.json", (req, res) => {
 //Posts
 app.post("/urls", (req, res) => {
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = req.body.longURL;
-  
+  if (req.cookies.user_id) {
+  urlDatabase[shortURL] = {longURL: req.body.longURL, userID: req.cookies.user_id};
   res.redirect(`/urls/${shortURL}`);
+  } else {
+    res.redirect("/urls");
+  }
 });
 
 // handle editing long url
 app.post("/urls/:id", (req,res) => {
+  const userid = req.cookies.user_id;
   const newURL = req.body.newURL;
-  if (newURL) {
-    urlDatabase[req.params.id] = newURL;
-    res.redirect("/urls")
+  const userURLs = getUserUrls(userid);
+  
+  if (Object.keys(userURLs).includes(req.params.id)) {
+    if (newURL) {
+      urlDatabase[req.params.id] = {longURL: newURL, userID: userid};
+      res.redirect("/urls")
+    }
+
+  } else {
+     res.status(401).send("You are not authorized to edit");
   }
+  
 });
 // handle Delete POSt
 app.post("/urls/:shortURL/delete", (req,res) => {
-  delete urlDatabase[req.params.shortURL];
-  res.redirect("/urls");
+  const userid = req.cookies.user_id;
+  const userURLs = getUserUrls(userid);
+  if (!userid) {
+    return res.status(401).send("You are not authorized to delete");
+  }
+  if (Object.keys(userURLs).includes(req.params.shortURL)) {
+    delete urlDatabase[req.params.shortURL];
+    res.redirect("/urls");
+  } else {
+    res.status(401).send(" You are not authorized to delete");
+  }
+  
 });
 
 // registeration handling
@@ -204,6 +240,17 @@ const getUserIdFromEmail = function(email) {
   }
 
   return false;
+}
+
+const getUserUrls = function(userId) {
+  const userUrls = {};
+
+  for (const urls in urlDatabase) {
+    if (urlDatabase[urls].userID === userId) {
+      userUrls[urls] = urlDatabase[urls];
+    }
+  }
+  return userUrls;
 }
 
 
