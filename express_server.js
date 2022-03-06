@@ -4,7 +4,7 @@ const PORT = 8080; // default port 8080
 const bodyParser = require("body-parser");
 const cookieSession = require("cookie-session");
 const bcrypt = require("bcryptjs");
-const {emailExists, getUserIdFromEmail, urlForUser, userIdExists} = require("./helpers");
+const {emailExists, getUserIdByEmail, urlForUser} = require("./helpers");
 
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({extended: true}));
@@ -48,7 +48,11 @@ const users = {
 };
 
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  if (req.session.userId) {
+    res.redirect("/urls");
+  } else {
+    res.redirect("/login")
+  }
 });
 
 app.get("/hello", (req, res) => {
@@ -200,7 +204,7 @@ app.post("/login",(req, res) => {
   }
 
   if(emailExists(email, users)) {
-    const id = getUserIdFromEmail(email, users);
+    const id = getUserIdByEmail(email, users);
     if (bcrypt.compareSync(password, users[id].password)) {
     req.session.userId = id;
     res.redirect("/urls");
