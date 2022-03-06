@@ -15,9 +15,9 @@ TinyApp is a full stack web application built with Node and Express that allows 
 
 !["Creating new URL"](https://github.com/mab321/tinyapp/blob/master/pics/newURL.png?raw=true)
 
-!["screenshot description"](#)
+!["short url edit page without logging in"](https://github.com/mab321/tinyapp/blob/master/pics/EditUrlWithoutLogin.png?raw=true)
 
-!["screenshot description"](#)
+!["short url edit page while logged in"](#)
 
 ## Dependencies
 
