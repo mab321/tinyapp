@@ -56,7 +56,7 @@ app.get("/hello", (req, res) => {
 });
 // main page
 app.get("/urls", (req, res) => {
-  const templateVars = {urls: getUserUrls(req.cookies.user_id), user: undefined};
+  const templateVars = {urls: urlForUser(req.cookies.user_id), user: undefined};
   if (req.cookies && req.cookies.user_id) {
     templateVars.user = users[req.cookies.user_id];
     
@@ -139,7 +139,7 @@ app.post("/urls", (req, res) => {
 app.post("/urls/:id", (req,res) => {
   const userid = req.cookies.user_id;
   const newURL = req.body.newURL;
-  const userURLs = getUserUrls(userid);
+  const userURLs = urlForUser(userid);
   
   if (Object.keys(userURLs).includes(req.params.id)) {
     if (newURL) {
@@ -155,7 +155,7 @@ app.post("/urls/:id", (req,res) => {
 // handle Delete POSt
 app.post("/urls/:shortURL/delete", (req,res) => {
   const userid = req.cookies.user_id;
-  const userURLs = getUserUrls(userid);
+  const userURLs = urlForUser(userid);
   if (!userid) {
     return res.status(401).send("You are not authorized to delete");
   }
@@ -242,7 +242,7 @@ const getUserIdFromEmail = function(email) {
   return false;
 }
 
-const getUserUrls = function(userId) {
+const urlForUser = function(userId) {
   const userUrls = {};
 
   for (const urls in urlDatabase) {
