@@ -8,6 +8,13 @@
 
 <body>
   <%- include('partials/_header') %>
+  <% if (user === undefined) { %>
+    <div class="card border-warning mb-3">
+      <div class="card-body text-warning">
+        <p class="card-text">Please login to edit the url</p>
+      </div>
+    </div>
+  <% } %>
   <div class="card text-center">
       <div class="card-header"></div>
       <div class="card-body">
